@@ -2,15 +2,14 @@
 /// Copyright (c) 2019 Rene Floor
 /// Released under MIT License.
 
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_cache_manager_hive/flutter_cache_manager_hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() {
   Hive.initFlutter();
-  Hive.registerAdapter(CacheObjectAdapter(typeId: 1));
+  Hive.registerAdapter(HiveCacheObjectAdapter(typeId: 1));
   runApp(MyApp());
 }
 
@@ -25,7 +24,7 @@ class MyApp extends StatelessWidget {
 }
 
 const CACHE_BOX_NAME = 'image-cache-box';
-const url = 'https://blurha.sh/assets/images/img1.jpg';
+const url = 'https://picsum.photos/200/300';
 
 class MyHomePage extends StatefulWidget {
   @override
@@ -33,11 +32,11 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  Stream<FileResponse> fileStream;
+  Stream<FileResponse>? fileStream;
 
   void _downloadFile() {
     setState(() {
-      fileStream = HiveCacheManager(box: Hive.openBox(CACHE_BOX_NAME))
+      fileStream = HiveCacheManager(boxName: CACHE_BOX_NAME)
           .getFileStream(url, withProgress: true);
     });
   }
@@ -55,14 +54,14 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
     return DownloadPage(
-      fileStream: fileStream,
+      fileStream: fileStream!,
       downloadFile: _downloadFile,
       clearCache: _clearCache,
     );
   }
 
   void _clearCache() {
-    HiveCacheManager(box: Hive.openBox(CACHE_BOX_NAME)).emptyCache();
+    HiveCacheManager(boxName: CACHE_BOX_NAME).emptyCache();
     setState(() {
       fileStream = null;
     });
@@ -74,7 +73,10 @@ class DownloadPage extends StatelessWidget {
   final VoidCallback downloadFile;
   final VoidCallback clearCache;
   const DownloadPage(
-      {Key key, this.fileStream, this.downloadFile, this.clearCache})
+      {required this.fileStream,
+      required this.downloadFile,
+      required this.clearCache,
+      Key? key})
       : super(key: key);
 
   @override
@@ -92,7 +94,8 @@ class DownloadPage extends StatelessWidget {
             subtitle: Text(snapshot.error.toString()),
           );
         } else if (loading) {
-          body = ProgressIndicator(progress: snapshot.data as DownloadProgress);
+          body =
+              ProgressIndicator(progress: snapshot.data as DownloadProgress?);
         } else {
           body = FileInfoWidget(
             fileInfo: snapshot.data as FileInfo,
@@ -122,7 +125,7 @@ AppBar _appBar() {
 
 class Fab extends StatelessWidget {
   final VoidCallback downloadFile;
-  const Fab({Key key, this.downloadFile}) : super(key: key);
+  const Fab({Key? key, required this.downloadFile}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -135,8 +138,8 @@ class Fab extends StatelessWidget {
 }
 
 class ProgressIndicator extends StatelessWidget {
-  final DownloadProgress progress;
-  const ProgressIndicator({Key key, this.progress}) : super(key: key);
+  final DownloadProgress? progress;
+  const ProgressIndicator({Key? key, required this.progress}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +166,8 @@ class FileInfoWidget extends StatelessWidget {
   final FileInfo fileInfo;
   final VoidCallback clearCache;
 
-  const FileInfoWidget({Key key, this.fileInfo, this.clearCache})
+  const FileInfoWidget(
+      {Key? key, required this.fileInfo, required this.clearCache})
       : super(key: key);
   @override
   Widget build(BuildContext context) {
@@ -173,11 +177,10 @@ class FileInfoWidget extends StatelessWidget {
           title: const Text('Original URL'),
           subtitle: Text(fileInfo.originalUrl),
         ),
-        if (fileInfo.file != null)
-          ListTile(
-            title: const Text('Local file path'),
-            subtitle: Text(fileInfo.file.path),
-          ),
+        ListTile(
+          title: const Text('Local file path'),
+          subtitle: Text(fileInfo.file.path),
+        ),
         ListTile(
           title: const Text('Loaded from'),
           subtitle: Text(fileInfo.source.toString()),
@@ -188,7 +191,7 @@ class FileInfoWidget extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.all(10.0),
-          child: RaisedButton(
+          child: ElevatedButton(
             child: const Text('CLEAR CACHE'),
             onPressed: clearCache,
           ),

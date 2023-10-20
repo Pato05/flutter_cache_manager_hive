@@ -1,23 +1,26 @@
 import 'dart:io';
 
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
-
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_cache_manager/src/storage/cache_object.dart';
 import 'package:flutter_cache_manager_hive/flutter_cache_manager_hive.dart';
 import 'package:flutter_cache_manager_hive/src/hive_cache_object_provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'benchmark.dart';
 
 void main() {
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   Hive.initFlutter();
-  Hive.registerAdapter(CacheObjectAdapter(typeId: 1));
+  Hive.registerAdapter(HiveCacheObjectAdapter(typeId: 1));
   runApp(MyApp());
-  DefaultCacheManager();
 }
 
 class MyApp extends StatelessWidget {
@@ -36,7 +39,7 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  MyHomePage({required this.title, Key? key}) : super(key: key);
 
   final String title;
 
@@ -45,29 +48,23 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  List<BenchmarkResult> _results;
+  List<BenchmarkResult>? _results;
 
   Future<void> _runBenchmark() async {
     await cleanRepo(sqflite);
     await cleanRepo(hive);
 
-    final urls = List<String>.generate(
-        1000, (index) => 'https://blurha.sh/assets/images/img$index.jpg');
+    final urls = List<String>.filled(1000, 'https://picsum.photos/200/300');
     final validTill = DateTime.now().add(const Duration(days: 30));
 
     final samplesSqflite = urls
         .map<CacheObject>((url) => CacheObject(url,
-            relativePath: '/relative/$url',
-            validTill: validTill,
-            eTag: url.hashCode.toString()))
+            relativePath: '/relative/$url', validTill: validTill))
         .toList();
 
     final samplesHive = urls
         .map<CacheObject>((url) => CacheObject(url,
-            id: url.hashCode,
-            relativePath: '/relative/$url',
-            validTill: validTill,
-            eTag: url.hashCode.toString()))
+            relativePath: '/relative/$url', validTill: validTill))
         .toList();
 
     final samplesMap = {'sqflite': samplesSqflite, 'hive': samplesHive};
@@ -79,8 +76,8 @@ class _MyHomePageState extends State<MyHomePage> {
     final results = <BenchmarkResult>[];
     for (final repoKey in ['sqflite', 'hive']) {
       for (final opKey in ['write', 'read', 'delete']) {
-        results.add(await benchmark(repoMap[repoKey], samplesMap[repoKey],
-            opMap[opKey], '$repoKey:$opKey'));
+        results.add(await benchmark(repoMap[repoKey]!, samplesMap[repoKey]!,
+            opMap[opKey]!, '$repoKey:$opKey'));
       }
     }
 
@@ -101,9 +98,9 @@ class _MyHomePageState extends State<MyHomePage> {
           ? const Center(
               child: Text('Tap Timer to measure cache store performance'))
           : ListView.builder(
-              itemCount: _results.length,
+              itemCount: _results!.length,
               itemBuilder: (context, index) {
-                final item = _results[index];
+                final item = _results![index];
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -147,7 +144,7 @@ final BenchmarkOperation opRead = (repo, sample) async {
 };
 
 final BenchmarkOperation opDelete = (repo, sample) async {
-  await repo.delete(sample.id);
+  await repo.delete(sample.id!);
 };
 
 final RepoMaker sqflite = () async {
@@ -160,7 +157,7 @@ final RepoMaker sqflite = () async {
 };
 
 final RepoMaker hive = () async {
-  final repo = HiveCacheObjectProvider(Hive.openBox('image-caching-box'));
+  final repo = HiveCacheObjectProvider('image-caching-box');
   return Future.value(repo);
 };
 
@@ -169,7 +166,7 @@ Future<void> cleanRepo(RepoMaker r) async {
 
   await repository.open();
   final ids =
-      (await repository.getAllObjects()).map<int>((co) => co.id).toList();
+      (await repository.getAllObjects()).map<int>((co) => co.id!).toList();
   print('Deleteing ${ids.length} items from ${repository.runtimeType}');
   await repository.deleteAll(ids);
   await repository.close();

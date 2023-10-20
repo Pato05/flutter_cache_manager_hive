@@ -1,46 +1,45 @@
+library flutter_cache_manager_hive;
+
 import 'package:flutter_cache_manager/src/storage/cache_object.dart';
-import 'package:clock/clock.dart';
 
 class HiveCacheObject extends CacheObject {
+  final String? _key;
+
+  @override
+  String get key => _key ?? url;
+
+  String? get actualKey => _key;
+
   HiveCacheObject(
     String url, {
-    String key,
-    String relativePath,
-    this.validTillMs,
-    this.touchedMs,
-    String eTag,
-  })  : key = key ?? url,
+    String? key,
+    required String relativePath,
+    required DateTime validTill,
+    String? eTag,
+    int? id,
+    int? length,
+    DateTime? touched,
+  })  : _touched = touched,
+        touchedMs = touched!.millisecondsSinceEpoch,
+        validTillMs = validTill.millisecondsSinceEpoch,
+        _key = key,
         super(url,
+            key: key,
             relativePath: relativePath,
-            validTill: DateTime.fromMillisecondsSinceEpoch(validTillMs),
+            validTill: validTill,
             eTag: eTag,
-            id: (key ?? url).hashCode);
+            id: id,
+            length: length);
 
-  factory HiveCacheObject.fromHiveMap(Map<dynamic, dynamic> map) =>
-      HiveCacheObject(
-        map['url'] as String,
-        key: map['key'] as String,
-        relativePath: map['relativePath'] as String,
-        validTillMs: map['validTillMs'] as int ?? 0,
-        touchedMs: map['touchedMs'] as int ?? 0,
-        eTag: map['eTag'] as String,
-      );
+  int validTillMs;
+  int? touchedMs;
 
-  /// Remove this once new version is released
-  final String key;
+  DateTime? _touched;
+  void setTouched(DateTime touched) {
+    _touched = touched;
+    touchedMs = _touched!.millisecondsSinceEpoch;
+  }
 
-  /// When this cached item becomes invalid
-  final int validTillMs;
-
-  /// Last time this entry was added/updated
-  final int touchedMs;
-
-  Map<dynamic, dynamic> toHiveMap() => {
-        'url': url,
-        'key': key,
-        'relativePath': relativePath,
-        'validTillMs': validTillMs ?? 0,
-        'touchedMs': clock.now().millisecondsSinceEpoch,
-        'eTag': eTag,
-      };
+  @override
+  DateTime? get touched => _touched;
 }

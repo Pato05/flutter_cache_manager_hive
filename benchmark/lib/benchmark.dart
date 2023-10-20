@@ -44,8 +44,13 @@ Future<BenchmarkResult> benchmark(
 
 /// times in microseconds
 class BenchmarkResult {
-  BenchmarkResult({this.tag, this.open, this.ops, this.opsLoop, this.close})
-      : total = open + opsLoop + close,
+  BenchmarkResult({
+    required this.tag,
+    required this.open,
+    required this.ops,
+    required this.opsLoop,
+    required this.close,
+  })  : total = open + opsLoop + close,
         opsAvg = (ops.reduce((a, b) => a + b) / ops.length).round(),
         opsMedian = median(ops);
   final String tag;
